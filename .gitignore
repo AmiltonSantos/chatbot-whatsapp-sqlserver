@@ -4,3 +4,5 @@
 /node_modules
 .vscode
 .env
+.wwebjs_auth
+.wwebjs_cache

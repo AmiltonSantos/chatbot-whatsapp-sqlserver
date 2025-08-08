@@ -205,36 +205,25 @@ async function iniciandoMessage() {
 
     // Exemplo de fluxo
     if (sessao.etapa === 'inicio') {
-      if (msg.body.match(/(menu|oi|olá|ola|eae|tudo|bem)/i)) {
+      if (msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola|Eae|eae|tudo|bem|Bem|Tudo)/i) && msg.from.endsWith('@c.us')) {
         const chat = await msg.getChat();
-        const contact = await msg.getContact();
-        const name = contact.pushname?.split(" ")[0] || 'amigo';
 
-        await delay(2000);
-        await chat.sendStateTyping();
-        await delay(2000);
-        await client.sendMessage(numero, `Olá *${name}*! Tudo bem?\n\nAqui é da *Empresa de Tal*.\nComo posso ajudá-lo hoje?\n\n*1 - Saiba mais*\n*2 - O que você deseja?*`);
+        await delay(3000); //delay de 3 segundos
+        await chat.sendStateTyping(); // Simulando Digitação
+        await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
+        const contact = await msg.getContact(); //Pegando o contato
+        const name = contact.pushname; //Pegando o nome do contato
+        await client.sendMessage(msg.from, 'Olá! *' + name.split(" ")[0] + '* Tudo bem?\n\nAqui é da *a1000ton Tecnologia.* \nComo posso ajudá-lo hoje? \nPor favor, digite uma das opções abaixo:\n\n*1 - Produtos mais vendidos*\n*2 - Ofertas de hoje*\n*3 - Ofertas especiais*\n*4 - Meus últimos pedidos*\n*5 - Outras perguntas*'); //Primeira mensagem de texto
+        await delay(3000); //delay de 3 segundos
+        await chat.sendStateTyping(); // Simulando Digitação
+        await delay(2000); //Delay de 2 segundos
 
         sessao.etapa = 'menu';
       }
     }
 
-    if (msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola|Eae|eae|tudo|bem|Bem|Tudo)/i) && msg.from.endsWith('@c.us')) {
-      const chat = await msg.getChat();
-
-      await delay(3000); //delay de 3 segundos
-      await chat.sendStateTyping(); // Simulando Digitação
-      await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
-      const contact = await msg.getContact(); //Pegando o contato
-      const name = contact.pushname; //Pegando o nome do contato
-      await client.sendMessage(msg.from, 'Olá! *' + name.split(" ")[0] + '* Tudo bem?\n\nAqui é da *Artnew Tecnologia.* \nComo posso ajudá-lo hoje? \nPor favor, digite uma das opções abaixo:\n\n*1 - Produtos mais vendidos*\n*2 - Ofertas de hoje*\n*3 - Ofertas especiais*\n*4 - Meus últimos pedidos*\n*5 - Outras perguntas*'); //Primeira mensagem de texto
-      await delay(3000); //delay de 3 segundos
-      await chat.sendStateTyping(); // Simulando Digitação
-      await delay(2000); //Delay de 2 segundos
-    }
-
     // 1 - Produtos Mas vendidos
-    if (msg.body !== null && msg.body === '1' && msg.from.endsWith('@c.us')) {
+    if (sessao.etapa === 'menu' && msg.body !== null && msg.body === '1' && msg.from.endsWith('@c.us')) {
       let resProdMasVend = '*1 - Produtos mais vendidos*\n\n';
       await carregarProdutosMasVendidos();
       const chat = await msg.getChat();
@@ -254,7 +243,7 @@ async function iniciandoMessage() {
     }
 
     // 2 - Ofertas de Hoje
-    if (msg.body !== null && msg.body === '2' && msg.from.endsWith('@c.us')) {
+    if (sessao.etapa === 'menu' && msg.body !== null && msg.body === '2' && msg.from.endsWith('@c.us')) {
       let resOfertaHoje = '*2 - Ofertas de hoje*\n\n';
       await carregarOfertasHoje();
       const chat = await msg.getChat();
@@ -273,7 +262,7 @@ async function iniciandoMessage() {
     }
 
     // 3 - Oferta Especiais
-    if (msg.body !== null && msg.body === '3' && msg.from.endsWith('@c.us')) {
+    if (sessao.etapa === 'menu' && msg.body !== null && msg.body === '3' && msg.from.endsWith('@c.us')) {
       let resOfertaEspeciais = '*3 - Ofertas especiais*\n\n';
       await carregarOfertasEspeciais();
       const chat = await msg.getChat();
@@ -292,7 +281,7 @@ async function iniciandoMessage() {
     }
 
     // 4 - Ultimos Pedidos
-    if (msg.body !== null && msg.body === '4' && msg.from.endsWith('@c.us')) {
+    if (sessao.etapa === 'menu' && msg.body !== null && msg.body === '4' && msg.from.endsWith('@c.us')) {
       let resUltimosPedidos = '*4 - Meus últimos pedidos*\n\n';
       await carregarUltimosPedidos();
       const chat = await msg.getChat();
@@ -312,7 +301,7 @@ async function iniciandoMessage() {
     }
 
     // 5 - Outras perguntas
-    if (msg.body !== null && msg.body === '5' && msg.from.endsWith('@c.us')) {
+    if (sessao.etapa === 'menu' && msg.body !== null && msg.body === '5' && msg.from.endsWith('@c.us')) {
       const chat = await msg.getChat();
 
       await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
