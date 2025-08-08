@@ -82,12 +82,8 @@
       padding: 12px;
     }
 
-    /* Caption under QR */
-    .qr-caption {
-      margin-top: 12px;
-      font-size: 13px;
-      color: var(--muted);
-      padding-bottom: 10px;
+    .form {
+      padding-top: 20px;
     }
 
     /* Button */
@@ -206,9 +202,8 @@
     <div class="qr">
       {{QRCODE}}
     </div>
-    <div class="qr-caption">Escaneie o QR Code</div>
 
-    <form method="POST" action="{{ACTION}}">
+    <form class="form" method="POST" action="{{ACTION}}">
       <button type="submit" class="{{CLASS_BOTAO}}" aria-pressed="false" aria-label="Conectar via WhatsApp">
         <!-- Ícone (paper plane) -->
         <svg class="{{CLASS_ICON}}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"

@@ -37,9 +37,7 @@ async function carregarNumerosAutorizados() {
     numerosAutorizados = result.recordset
       .filter(row => row.numero) // ignora valores nulos/undefined
       .map(row => row.numero.trim() + '@c.us');
-
-    console.error('Resultado Numeros:', numerosAutorizados);
-  } catch (err) {
+    } catch (err) {
     console.error('Erro ao carregar números do SQL Server:', err);
   } finally {
     await sql.close();
@@ -158,7 +156,6 @@ async function criarCliente() {
     // Inicialização do messager 
     if (!isInicializacao) {
       (async () => {
-        await carregarNumerosAutorizados();
         await iniciandoMessage();
       })();
     }
@@ -324,7 +321,7 @@ app.get('/', (req, res) => {
       .replace('{{ACTION}}', conectado ? '/logout' : '/login')
       .replace('{{CLASS_BOTAO}}', conectado ? 'btnDesc' : 'btn')
       .replace('{{CLASS_ICON}}', conectado ? 'iconDesc' : 'icon')
-      .replace('{{SPAN}}', conectado ? 'Desconectar' : 'Conectar');
+      .replace('{{SPAN}}', conectado ? 'Desconectar' : 'Gerar QR CODE');
 
     res.send(finalHtml);
   });
@@ -357,6 +354,7 @@ app.post('/logout', async (req, res) => {
 app.post('/login', async (req, res) => {
   if (!client) {
     isSpinner = true;
+    await carregarNumerosAutorizados();
     await criarCliente(); // Cria novo client após desconectar
     console.log('Sessão iniciada.');
   }
