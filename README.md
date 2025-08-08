@@ -7,3 +7,16 @@
 
 # chatbot-whatsapp-sqlserver-express
 Criando um chatbot com whatsapp-web.js, mssql e express
+
+### Instalar o NodeJs:
+-Instalar o NODEJS, versão compativel **v22.17.0** [https://nodejs.org/en/](https://nodejs.org/en/) 
+
+### Instalando dependências:
+```bash
+$ npm install
+```
+
+### Iniciar projeto:
+```bash
+$ node app.js
+```
