@@ -16,6 +16,9 @@ Criando um chatbot com whatsapp-web.js, mssql e express
 $ npm install
 ```
 
+### Configurações necessárias inicio do projeto:
+-Renomear o arquivo na raiz *.env-exemple* para *.env* e editar os dados da conexão com seu banco de dados SqlServer
+
 ### Iniciar projeto:
 ```bash
 $ node app.js
