@@ -23,7 +23,7 @@ async function carregarNumerosAutorizados() {
     try {
       const queryNumeros = await conectSqlserver('SELECT numero, responsavel FROM numeros');
 
-      const resultFilter = numerosAutorizados = queryNumeros
+      const resultFilter = queryNumeros
         .filter(row => row.numero) // ignora valores nulos/undefined
         .map(row => row.numero.trim() + '@c.us');
       

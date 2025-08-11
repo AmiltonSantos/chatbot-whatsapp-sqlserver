@@ -1,16 +1,8 @@
-const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
-const fs = require('fs');
-const path = require('path');
 const conexao = require('./conexao');
 
-const app = express();
-const port = 3000;
-
-app.use(express.urlencoded({ extended: true })); // Para poder receber POST
-const authPath = path.join(__dirname, '.wwebjs_auth'); // pasta onde salva o login
-const authCache = path.join(__dirname, '.wwebjs_cache'); // cookies e dados temporários da sessão
+const delay = ms => new Promise(res => setTimeout(res, ms)); // Função que usamos para criar o delay entre uma ação e outra
 
 const sessoesUsuarios = new Map();
 let numerosAutorizados = [];
@@ -19,63 +11,74 @@ let ofertaHoje = [];
 let ofertaEspecias = [];
 let ultimosPedidos = [];
 
-let qrCodeBase64 = '';
-let client;
-let conectado = false;
-let isSpinner = false;
-let isInicializacao = false;
-
-const delay = ms => new Promise(res => setTimeout(res, ms)); // Função que usamos para criar o delay entre uma ação e outra
+let exportInfo = {
+  qrCodeBase64: '',
+  conectado: false,
+  isInicializacao: false,
+  isSpinner: false,
+  client: undefined
+}
 
 // Inicia carramento do QRCode
 async function criarCliente() {
-  client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage' // Importante para ambientes com pouca memória
-      ]
+  return new Promise(async (resolve, reject) => {
+    try {
+      numerosAutorizados = await conexao.carregarNumerosAutorizados();
+
+      exportInfo.client = new Client({
+        authStrategy: new LocalAuth(),
+        puppeteer: {
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage' // Importante para ambientes com pouca memória
+          ]
+        }
+      });
+    
+      exportInfo.client.on('qr', async (qr) => {
+        exportInfo.qrCodeBase64 = await qrcode.toDataURL(qr);
+        exportInfo.isSpinner = false;
+        exportInfo.conectado = true;
+            
+        // Inicialização do messager 
+        if (!exportInfo.isInicializacao) {
+          (async () => {
+            resolve(true);
+            await iniciandoMessage();
+          })();
+        }
+        console.log('QR Code atualizado');
+      });
+    
+      exportInfo.client.on('ready', () => {
+        console.log('✅ WhatsApp conectado!');
+        exportInfo.qrCodeBase64 = '';
+      });
+    
+      exportInfo.client.on('auth_failure', msg => {
+        console.error('Falha na autenticação:', msg);
+        exportInfo.qrCodeBase64 = ''; // Limpa o QR ao conectar
+        criarCliente(); // Cria novo client após desconectar
+        exportInfo.client.initialize();
+      });
+    
+      exportInfo.client.on('disconnected', () => {
+        console.log('🔌 Desconectado.');
+        exportInfo.qrCodeBase64 = ''; // Limpa o QR ao conectar
+        criarCliente(); // Cria novo client após desconectar
+        exportInfo.client.initialize();
+      });
+    
+      exportInfo.client.initialize();
+
+    } catch (err) {
+      reject(err);
     }
-  });
-
-  client.on('qr', async (qr) => {
-    qrCodeBase64 = await qrcode.toDataURL(qr);
-    isSpinner = false;
-    conectado = true;
-
-    // Inicialização do messager 
-    if (!isInicializacao) {
-      (async () => {
-        await iniciandoMessage();
-      })();
-    }
-    console.log('QR Code atualizado');
-  });
-
-  client.on('ready', () => {
-    console.log('✅ WhatsApp conectado!');
-    qrCodeBase64 = '';
-  });
-
-  client.on('auth_failure', msg => {
-    console.error('Falha na autenticação:', msg);
-    qrCodeBase64 = ''; // Limpa o QR ao conectar
-    criarCliente(); // Cria novo client após desconectar
-    client.initialize();
-  });
-
-  client.on('disconnected', () => {
-    console.log('🔌 Desconectado.');
-    qrCodeBase64 = ''; // Limpa o QR ao conectar
-    criarCliente(); // Cria novo client após desconectar
-    client.initialize();
-  });
-
-  client.initialize();
+  });  
 }
+
 
 // Verifica se é um contato privado e autorizado
 function isPrivadoAutorizado(msg) {
@@ -93,8 +96,8 @@ function getSessao(numero) {
 
 // Funil
 async function iniciandoMessage() {
-  isInicializacao = true;
-  client.on('message', async msg => {
+  exportInfo.isInicializacao = true;
+  exportInfo.client.on('message', async msg => {
     const numero = msg.from;
 
     // Ignora mensagens de grupos
@@ -116,7 +119,7 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         const contact = await msg.getContact(); //Pegando o contato
         const name = contact.pushname; //Pegando o nome do contato
-        await client.sendMessage(numero, 'Olá! *' + name.split(" ")[0] + '* Tudo bem?\n\nAqui é da *a1000ton Tecnologia.* \nComo posso ajudá-lo hoje? \nPor favor, digite uma das opções abaixo:\n\n*1 - Produtos mais vendidos*\n*2 - Ofertas de hoje*\n*3 - Ofertas especiais*\n*4 - Meus últimos pedidos*\n*5 - Outras perguntas*'); //Primeira mensagem de texto
+        await exportInfo.client.sendMessage(numero, 'Olá! *' + name.split(" ")[0] + '* Tudo bem?\n\nAqui é da *a1000ton Tecnologia.* \nComo posso ajudá-lo hoje? \nPor favor, digite uma das opções abaixo:\n\n*1 - Produtos mais vendidos*\n*2 - Ofertas de hoje*\n*3 - Ofertas especiais*\n*4 - Meus últimos pedidos*\n*5 - Outras perguntas*'); //Primeira mensagem de texto
         await delay(2000); //Delay de 2 segundos
 
         sessao.etapa = 'menu';
@@ -141,7 +144,7 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         await chat.sendStateTyping(); // Simulando Digitação
         await delay(2000);
-        await client.sendMessage(numero, `${resProdMasVend}`);
+        await exportInfo.client.sendMessage(numero, `${resProdMasVend}`);
       }
 
       // 2 - Ofertas de Hoje
@@ -160,7 +163,7 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         await chat.sendStateTyping(); // Simulando Digitação
         await delay(2000);
-        await client.sendMessage(numero, `${resOfertaHoje}`);
+        await exportInfo.client.sendMessage(numero, `${resOfertaHoje}`);
       }
 
       // 3 - Oferta Especiais
@@ -179,7 +182,7 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         await chat.sendStateTyping(); // Simulando Digitação
         await delay(2000);
-        await client.sendMessage(numero, `${resOfertaEspeciais}`);
+        await exportInfo.client.sendMessage(numero, `${resOfertaEspeciais}`);
       }
 
       // 4 - Ultimos Pedidos
@@ -199,7 +202,7 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         await chat.sendStateTyping(); // Simulando Digitação
         await delay(2000);
-        await client.sendMessage(numero, `${resUltimosPedidos}`);
+        await exportInfo.client.sendMessage(numero, `${resUltimosPedidos}`);
       }
 
       // 5 - Outras perguntas
@@ -209,64 +212,14 @@ async function iniciandoMessage() {
         await delay(3000); //Delay de 3000 milisegundos mais conhecido como 3 segundos
         await chat.sendStateTyping(); // Simulando Digitação
         await delay(3000);
-        await client.sendMessage(numero, `A *Artnew Tecnologia* agradece seu contato!`);
+        await exportInfo.client.sendMessage(numero, `A *Artnew Tecnologia* agradece seu contato!`);
       }
     }
   });
 }
 
-// Rota principal
-app.get('/', (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'index.html');
-  fs.readFile(filePath, 'utf8', (err, html) => {
-    if (err) return res.status(500).send('Erro ao carregar HTML');
-
-    const finalHtml = html
-      .replace('{{SPINNER}}', isSpinner ? '<div class="spinner"></div>' : '')
-      .replace('{{QRCODE}}', qrCodeBase64 ? `<img src="${qrCodeBase64}" />` : 'QR Code')
-      .replace('{{ACTION}}', conectado ? '/logout' : '/login')
-      .replace('{{CLASS_BOTAO}}', conectado ? 'btnDesc' : 'btn')
-      .replace('{{CLASS_ICON}}', conectado ? 'iconDesc' : 'icon')
-      .replace('{{SPAN}}', conectado ? 'Desconectar' : 'Gerar QR CODE');
-
-    res.send(finalHtml);
-  });
-});
-
-// Rota para desconectar
-app.post('/logout', async (req, res) => {
-  if (client) {
-    await client.destroy();
-    client = '';
-    conectado = false;
-    isInicializacao = false;
-    qrCodeBase64 = ''
-
-    if (fs.existsSync(authPath)) {
-      fs.rmSync(authPath, { recursive: true, force: true });
-      console.log('Sessão removida.');
-    }
-
-    if (fs.existsSync(authCache)) {
-      fs.rmSync(authCache, { recursive: true, force: true });
-      console.log('Cookies e dados temporários removidas.');
-    }
-    console.log('Sessão encerrada manualmente.');
-  }
-  res.redirect('/');
-});
-
-// Rota para desconectar
-app.post('/login', async (req, res) => {
-  if (!client) {
-    isSpinner = true;
-    numerosAutorizados = await conexao.carregarNumerosAutorizados();
-    await criarCliente(); // Cria novo client após desconectar
-    console.log('Sessão iniciada.');
-  }
-  res.redirect('/');
-});
-
-app.listen(port, () => {
-  console.log(`🟢 Servidor rodando em: http://localhost:${port}`);
-});
+// Exporta as funções para poder usar em outro arquivo
+module.exports = {
+  criarCliente,
+  exportInfo
+};
