@@ -1,10 +1,9 @@
-const sql = require('mssql');
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
-const config = require('./config');
+const conexao = require('./conexao');
 
 const app = express();
 const port = 3000;
@@ -28,113 +27,7 @@ let isInicializacao = false;
 
 const delay = ms => new Promise(res => setTimeout(res, ms)); // Função que usamos para criar o delay entre uma ação e outra
 
-// Pega as configurações de acesso do Sqlserver
-async function conectSqlserver(sendQuery) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      await sql.connect(config);
-      const result = await sql.query(sendQuery);
-      resolve(result.recordset);
-    } catch (err) {
-      reject(err);
-    } finally {
-      await sql.close();
-    }
-  });
-}
-
-// Carrega os números da tabela do Postgres que vai ser altorizados a enviar mensagens
-async function carregarNumerosAutorizados() {
-  try {
-    const queryNumeros = await conectSqlserver('SELECT numero, responsavel FROM numeros');
-
-    numerosAutorizados = queryNumeros
-      .filter(row => row.numero) // ignora valores nulos/undefined
-      .map(row => row.numero.trim() + '@c.us');
-  } catch (err) {
-    console.error('1 - Erro no processamento da query no SQL Server:', err);
-  }
-}
-
-// Carrega os produtos mas vendidos
-async function carregarProdutosMasVendidos() {
-  try {
-    const queryMasVendidos = await conectSqlserver(`
-        SELECT TOP 3  
-            p.nome,
-            p.quantidadeCaixa,
-            tp.precoProduto,
-            tp.percentualDesconto
-        FROM produto p
-        INNER JOIN tabela_preco_produto tp ON tp.produtoId = p.id
-        WHERE tp.percentualDesconto > 3
-    `);
-
-    produtosMasVendidos = queryMasVendidos;
-  } catch (err) {
-    console.error('2 - Erro no processamento da query no SQL Server:', err);
-  }
-}
-
-// Carrega ofertas de hoje
-async function carregarOfertasHoje() {
-  try {
-    const queryOfertaHoje = await conectSqlserver(`
-        SELECT TOP 3
-            produtoNomeStr,
-            quantidadeComprada,
-            valor
-        FROM item_pedido_temp 
-        ORDER BY pedidoTempid DESC
-    `);
-
-    ofertaHoje = queryOfertaHoje;
-  } catch (err) {
-    console.error('3 - Erro no processamento da query no SQL Server:', err);
-  }
-}
-
-// Carrega dados oferta especiais
-async function carregarOfertasEspeciais() {
-  try {
-    const queryOfertaEspeciais = await conectSqlserver(`
-        SELECT TOP 3
-            i.produtoNomeStr,
-            p.dataEnvioPedido,
-            i.valor
-        FROM pedido_temp p 
-        INNER JOIN item_pedido_temp i ON i.pedidoTempid = p.id
-        WHERE p.statusPedido = 1
-        ORDER BY pedidoTempid DESC
-    `);
-
-    ofertaEspecias = queryOfertaEspeciais;
-  } catch (err) {
-    console.error('4 - Erro no processamento da query no SQL Server:', err);
-  }
-}
-
-// Carrega dados ultimos pedidos
-async function carregarUltimosPedidos() {
-  try {
-    const queryUltimosPedidos = await conectSqlserver(`
-            SELECT TOP 3
-                i.produtoNomeStr,
-                i.quantidadeComprada,
-                i.valor,
-                p.dataEnvioPedido
-            FROM pedido_temp p 
-            INNER JOIN item_pedido_temp i ON i.pedidoTempid = p.id
-            WHERE p.statusPedido = 1
-            ORDER BY pedidoTempid DESC
-        `);
-
-    ultimosPedidos = queryUltimosPedidos;
-  } catch (err) {
-    console.error('5 - Erro no processamento da query no SQL Server:', err);
-  }
-}
-
+// Inicia carramento do QRCode
 async function criarCliente() {
   client = new Client({
     authStrategy: new LocalAuth(),
@@ -224,8 +117,6 @@ async function iniciandoMessage() {
         const contact = await msg.getContact(); //Pegando o contato
         const name = contact.pushname; //Pegando o nome do contato
         await client.sendMessage(numero, 'Olá! *' + name.split(" ")[0] + '* Tudo bem?\n\nAqui é da *a1000ton Tecnologia.* \nComo posso ajudá-lo hoje? \nPor favor, digite uma das opções abaixo:\n\n*1 - Produtos mais vendidos*\n*2 - Ofertas de hoje*\n*3 - Ofertas especiais*\n*4 - Meus últimos pedidos*\n*5 - Outras perguntas*'); //Primeira mensagem de texto
-        await delay(3000); //delay de 3 segundos
-        await chat.sendStateTyping(); // Simulando Digitação
         await delay(2000); //Delay de 2 segundos
 
         sessao.etapa = 'menu';
@@ -236,7 +127,7 @@ async function iniciandoMessage() {
     if (sessao.etapa === 'menu') {
       if (msg.body !== null && msg.body === '1') {
         let resProdMasVend = '*1 - Produtos mais vendidos*\n\n';
-        await carregarProdutosMasVendidos();
+        produtosMasVendidos = await conexao.carregarProdutosMasVendidos();
         const chat = await msg.getChat();
 
         produtosMasVendidos.forEach(vend => {
@@ -256,7 +147,7 @@ async function iniciandoMessage() {
       // 2 - Ofertas de Hoje
       if (msg.body !== null && msg.body === '2') {
         let resOfertaHoje = '*2 - Ofertas de hoje*\n\n';
-        await carregarOfertasHoje();
+        ofertaHoje = await conexao.carregarOfertasHoje();
         const chat = await msg.getChat();
 
         ofertaHoje.forEach(hoje => {
@@ -275,7 +166,7 @@ async function iniciandoMessage() {
       // 3 - Oferta Especiais
       if (msg.body !== null && msg.body === '3') {
         let resOfertaEspeciais = '*3 - Ofertas especiais*\n\n';
-        await carregarOfertasEspeciais();
+        ofertaEspecias = await conexao.carregarOfertasEspeciais();
         const chat = await msg.getChat();
 
         ofertaEspecias.forEach(esp => {
@@ -294,7 +185,7 @@ async function iniciandoMessage() {
       // 4 - Ultimos Pedidos
       if (msg.body !== null && msg.body === '4') {
         let resUltimosPedidos = '*4 - Meus últimos pedidos*\n\n';
-        await carregarUltimosPedidos();
+        ultimosPedidos = await conexao.carregarUltimosPedidos();
         const chat = await msg.getChat();
 
         ultimosPedidos.forEach(ult => {
@@ -369,7 +260,7 @@ app.post('/logout', async (req, res) => {
 app.post('/login', async (req, res) => {
   if (!client) {
     isSpinner = true;
-    await carregarNumerosAutorizados();
+    numerosAutorizados = await conexao.carregarNumerosAutorizados();
     await criarCliente(); // Cria novo client após desconectar
     console.log('Sessão iniciada.');
   }
